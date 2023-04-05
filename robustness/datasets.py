@@ -19,7 +19,7 @@ import pathlib
 
 import torch as ch
 import torch.utils.data
-from . import imagenet_models, cifar_models
+from . import imagenet_models
 from torchvision import transforms, datasets
 
 from .tools import constants
@@ -34,10 +34,6 @@ from .tools.helpers import get_label_mapping
 # In order:
 ## ImageNet
 ## Restricted Imagenet 
-## Other Datasets:
-## - CIFAR
-## - CINIC
-## - A2B (orange2apple, horse2zebra, etc)
 ###
 
 class DataSet(object):
@@ -323,178 +319,11 @@ class CustomImageNet(DataSet):
             raise ValueError("Dataset doesn't support pytorch_pretrained")
         return imagenet_models.__dict__[arch](num_classes=self.num_classes)
 
-class CIFAR(DataSet):
-    """
-    CIFAR-10 dataset [Kri09]_.
-
-    A dataset with 50k training images and 10k testing images, with the
-    following classes:
-
-    * Airplane
-    * Automobile
-    * Bird
-    * Cat
-    * Deer
-    * Dog
-    * Frog
-    * Horse
-    * Ship
-    * Truck
-
-    .. [Kri09] Krizhevsky, A (2009). Learning Multiple Layers of Features
-        from Tiny Images. Technical Report.
-    """
-    def __init__(self, data_path='/tmp/', **kwargs):
-        """
-        """
-        ds_kwargs = {
-            'num_classes': 10,
-            'mean': ch.tensor([0.4914, 0.4822, 0.4465]),
-            'std': ch.tensor([0.2023, 0.1994, 0.2010]),
-            'custom_class': datasets.CIFAR10,
-            'label_mapping': None, 
-            'transform_train': da.TRAIN_TRANSFORMS_DEFAULT(32),
-            'transform_test': da.TEST_TRANSFORMS_DEFAULT(32)
-        }
-        ds_kwargs = self.override_args(ds_kwargs, kwargs)
-        super(CIFAR, self).__init__('cifar', data_path, **ds_kwargs)
-
-    def get_model(self, arch, pretrained):
-        """
-        """
-        if pretrained:
-            raise ValueError('CIFAR does not support pytorch_pretrained=True')
-        return cifar_models.__dict__[arch](num_classes=self.num_classes)
-
-class CINIC(DataSet):
-    """
-    CINIC-10 dataset [DCA+18]_.
-
-    A dataset with the same classes as CIFAR-10, but with downscaled images
-    from various matching ImageNet classes added in to increase the size of
-    the dataset.
-
-    .. [DCA+18] Darlow L.N., Crowley E.J., Antoniou A., and A.J. Storkey
-        (2018) CINIC-10 is not ImageNet or CIFAR-10. Report
-        EDI-INF-ANC-1802 (arXiv:1810.03505)
-    """
-    def __init__(self, data_path, **kwargs):
-        """
-        """
-        ds_kwargs = {
-            'num_classes': 10,
-            'mean': ch.tensor([0.47889522, 0.47227842, 0.43047404]),
-            'std': ch.tensor([0.24205776, 0.23828046, 0.25874835]),
-            'custom_class': None,
-            'label_mapping': None,
-            'transform_train': da.TRAIN_TRANSFORMS_DEFAULT(32),
-            'transform_test': da.TEST_TRANSFORMS_DEFAULT(32)
-        }
-        ds_kwargs = self.override_args(ds_kwargs, kwargs)
-        super(CINIC, self).__init__('cinic', data_path, **ds_kwargs)
-
-    def get_model(self, arch, pretrained):
-        """
-        """
-        if pretrained:
-            raise ValueError('CINIC does not support pytorch_pretrained=True')
-        return cifar_models.__dict__[arch](num_classes=self.num_classes)
-
-class A2B(DataSet):
-    """
-    A-to-B datasets [ZPI+17]_
-
-    A general class for image-to-image translation dataset. Currently
-    supported are:
-    
-    * Horse <-> Zebra
-    * Apple <-> Orange
-    * Summer <-> Winter
-
-    .. [ZPI+17] Zhu, J., Park, T., Isola, P., & Efros, A.A. (2017).
-        Unpaired Image-to-Image Translation Using Cycle-Consistent
-        Adversarial Networks. 2017 IEEE International Conference on
-        Computer Vision (ICCV), 2242-2251.
-    """
-    def __init__(self, data_path, **kwargs):
-        """
-        """
-        ds_name = pathlib.Path(data_path).parts[-1]
-        valid_names = ['horse2zebra', 'apple2orange', 'summer2winter_yosemite']
-        assert ds_name in valid_names, \
-                f"path must end in one of {valid_names}, not {ds_name}"
-        ds_kwargs = {
-            'num_classes': 2,
-            'mean': ch.tensor([0.5, 0.5, 0.5]),
-            'custom_class': None,
-            'std': ch.tensor([0.5, 0.5, 0.5]),
-            'transform_train': da.TRAIN_TRANSFORMS_IMAGENET,
-            'label_mapping': None,
-            'transform_test': da.TEST_TRANSFORMS_IMAGENET
-        }
-        ds_kwargs = self.override_args(ds_kwargs, kwargs)
-        super(A2B, self).__init__(ds_name, data_path, **ds_kwargs)
-
-    def get_model(self, arch, pretrained=False):
-        """
-        """
-        if pretrained:
-            raise ValueError('A2B does not support pytorch_pretrained=True')
-        return imagenet_models.__dict__[arch](num_classes=self.num_classes)
-
-class OpenImages(DataSet):
-    """
-    OpenImages dataset [KDA+17]_
-
-    More info: https://storage.googleapis.com/openimages/web/index.html
-
-    600-way classification with graular labels and bounding boxes.
-
-    ..[KDA+17] Krasin I., Duerig T., Alldrin N., Ferrari V., Abu-El-Haija S.,
-    Kuznetsova A., Rom H., Uijlings J., Popov S., Kamali S., Malloci M.,
-    Pont-Tuset J., Veit A., Belongie S., Gomes V., Gupta A., Sun C., Chechik G.,
-    Cai D., Feng Z., Narayanan D., Murphy K. (2017). OpenImages: A public
-    dataset for large-scale multi-label and multi-class image classification.
-    Available from https://storage.googleapis.com/openimages/web/index.html. 
-    """
-    def __init__(self, data_path, custom_grouping=None, **kwargs):
-        """
-        """
-        if custom_grouping is None:
-            num_classes = 601
-            label_mapping = None 
-        else:
-            num_classes = len(custom_grouping)
-            label_mapping = get_label_mapping("custom_imagenet", custom_grouping)
-
-        ds_kwargs = {
-            'num_classes': num_classes,
-            'mean': ch.tensor([0.4859, 0.4131, 0.3083]),
-            'std': ch.tensor([0.2919, 0.2507, 0.2273]),
-            'custom_class': openimgs_helpers.OIDatasetFolder,
-            'label_mapping': label_mapping, 
-            'transform_train': da.TRAIN_TRANSFORMS_IMAGENET,
-            'transform_test': da.TEST_TRANSFORMS_IMAGENET
-        }
-        ds_kwargs = self.override_args(ds_kwargs, kwargs)
-        super(OpenImages, self).__init__('openimages', data_path, **ds_kwargs)
-
-    def get_model(self, arch, pretrained):
-        """
-        """
-        if pretrained:
-            raise ValueError('OpenImages does not support pytorch_pretrained=True')
-        return imagenet_models.__dict__[arch](num_classes=self.num_classes)
 
 DATASETS = {
     'imagenet': ImageNet,
     'restricted_imagenet': RestrictedImageNet,
     'custom_imagenet': CustomImageNet,
-    'cifar': CIFAR,
-    'cinic': CINIC,
-    'a2b': A2B,
-    'places365': Places365,
-    'openimages': OpenImages
 }
 '''
 Dictionary of datasets. A dataset class can be accessed as:
