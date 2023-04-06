@@ -1,6 +1,5 @@
 import argparse
 
-from . import cifar_models
 from .tools import folder
 
 import os
